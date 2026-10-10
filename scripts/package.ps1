@@ -13,6 +13,7 @@ try {
         Copy-Item -LiteralPath "dist/GeoPulse-windows-$arch.exe" -Destination (Join-Path $stage 'GeoPulse.exe')
         Copy-Item -LiteralPath README.md, LICENSE -Destination $stage
         Copy-Item -LiteralPath docs -Destination $stage -Recurse -Force
+        Copy-Item -LiteralPath assets/GeoPulse.ico -Destination $stage -Force
         $zip = "$stage.zip"
         Compress-Archive -Path "$stage/*" -DestinationPath $zip -Force
         Get-FileHash -LiteralPath $zip -Algorithm SHA256 | Select-Object Path, Hash
@@ -20,7 +21,7 @@ try {
     # 额外交付可直接 git init 的源码包，只复制明确的工程文件。
     $sourceStage = Join-Path $projectRoot "dist/GeoPulse-$Version-source"
     New-Item -ItemType Directory -Force -Path $sourceStage | Out-Null
-    foreach ($sourcePath in @('.gitattributes', '.gitignore', 'go.mod', 'LICENSE', 'README.md', '.github', 'cmd', 'internal', 'scripts', 'docs')) {
+    foreach ($sourcePath in @('.gitattributes', '.gitignore', 'go.mod', 'LICENSE', 'README.md', '.github', 'assets', 'cmd', 'internal', 'scripts', 'docs')) {
         Copy-Item -LiteralPath $sourcePath -Destination $sourceStage -Recurse -Force
     }
     $sourceZip = "$sourceStage.zip"

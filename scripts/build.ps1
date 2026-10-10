@@ -11,6 +11,9 @@ try {
     $env:CGO_ENABLED = '0'
     $env:GOOS = 'windows'
     $env:GOARCH = $Arch
+    if (-not (Test-Path -LiteralPath "cmd/geopulse/rsrc_windows_$Arch.syso")) {
+        throw 'Missing application icon resource. Run scripts/generate-icons.ps1 first.'
+    }
     New-Item -ItemType Directory -Force -Path dist | Out-Null
     $target = "dist/GeoPulse-windows-$Arch.exe"
     & $Go build -trimpath -ldflags "-s -w -H=windowsgui -X main.version=$Version" -o $target ./cmd/geopulse
