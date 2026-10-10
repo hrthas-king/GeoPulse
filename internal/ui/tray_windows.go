@@ -174,10 +174,11 @@ func (t *Tray) update(s app.Snapshot) error {
 		for y := 0; y < 32; y++ {
 			for x := 0; x < 32; x++ {
 				src := (y*32 + x) * 4
-				dst := ((31-y)*32 + x) * 4
+				// CreateIcon 接收 DDB 行序；这里保持顶向下，不能按 BMP 文件倒序。
+				dst := (y*32 + x) * 4
 				xor[dst], xor[dst+1], xor[dst+2], xor[dst+3] = pixels[src+2], pixels[src+1], pixels[src], pixels[src+3]
 				if pixels[src+3] == 0 {
-					and[(31-y)*4+x/8] |= 1 << uint(7-x%8)
+					and[y*4+x/8] |= 1 << uint(7-x%8)
 				}
 			}
 		}
@@ -224,9 +225,12 @@ func (t *Tray) menu() {
 		if s.WatchError != "" {
 			add(0, "网络事件监听失败；仍有 15 分钟保底刷新", 2)
 		}
+		if s.EgressActive {
+			add(0, "TUN/代理：地区最长 30 秒自动复核", 2)
+		}
 	}
 	add(0, "", 0x800)
-	add(Refresh, "立即刷新 IP（最短间隔 30 秒）", 0)
+	add(Refresh, "立即刷新 IP（最短间隔 2 秒）", 0)
 	interval := 1
 	if s != nil {
 		interval = s.IntervalSeconds

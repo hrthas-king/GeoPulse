@@ -17,13 +17,15 @@
 - 悬停显示公网 IP、国家、上行 / 下行实际速率、ICMP RTT，以及上行证据状态。
 - 网卡 64 位 IO 计数固定 **每秒采样**，按真实经过时间计算 B/s；切换接口、计数回滚或网卡不可用时重建基线。
 - **每秒最多一个** 32 字节 ICMP payload，650ms 超时；失败下一秒切换 `1.1.1.1` / `8.8.8.8`，连续两次失败触发断网警告，收到成功响应立即恢复。
-- 监听系统接口、单播地址、路由变化；750ms 合并事件、30s 定位冷却，15 分钟保底定位。
+- 监听系统接口、单播地址、路由变化；750ms 合并事件、自动查询最短 30s。TUN/代理模式另外观察本地端点变化，并每 30s 复核出口；普通模式仍为 15 分钟保底。
 - 右键：刷新 IP、1s / 2s / 5s 检测显示间隔、当前用户开机自启、退出。设置保存在 `%LOCALAPPDATA%\GeoPulse\config.json`。
 - Explorer 重启后自动重建托盘图标；命名互斥体避免同一登录会话重复驻留。
 
 **带宽说明：**秒级探针不可能消耗零带宽。一次 IPv4 Echo 请求 / 回复各约 60 字节（32 payload + 8 ICMP + 20 IPv4），合计约 **120 B/s、0.96 kbit/s**，不含链路层、VPN 封装及低频 HTTPS 握手。GeoPulse 不进行主动测速、大文件下载或每秒访问 IP API。
 
 **内存说明：**10 MB 是资源目标，不能以 Go 堆软限制替代整个进程的硬性保证。Windows 共享 DLL、TLS、驱动与系统版本都会影响占用。实测数据、测量口径与未达成的限制见 [验证记录](docs/VALIDATION.md)。
+
+**v0.1.1 修复：**图标朝向恢复正常，TUN 内切换节点可以更新地区。手动刷新最短合并间隔为 2 秒；没有可观察本地切换信号的客户端，自动更新最多等待约 30 秒加查询时间。[更新记录](docs/CHANGELOG.md)
 
 ## 功能截图预留位
 
@@ -96,6 +98,7 @@ GeoPulse/
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── VALIDATION.md
+│   ├── CHANGELOG.md
 │   └── screenshots/README.md
 ├── .github/workflows/
 │   ├── ci.yml                      # 测试、静态检查、双架构构建
@@ -121,11 +124,11 @@ GeoPulse/
 
 NIC 总发送量不证明公网可达；Ping 无响应也不能单独定位为上行或下行物理故障。禁止 ICMP 的企业网络、探针服务不可达或 IPv6-only 网络可能触发告警；这里的红色表示**探针连续未验证公网连通性**。
 
-定位优先访问 `https://1.1.1.1/cdn-cgi/trace`，失败才尝试 `https://www.cloudflare.com/cdn-cgi/trace`，一次刷新最多两次有界请求。保留系统证书验证，禁用重定向和 cookie，响应上限 16 KiB。仅解析公网 IP 与 ISO 两位国家代码，不保存城市、坐标或历史 IP。
+定位访问 `https://www.cloudflare.com/cdn-cgi/trace`，失败才尝试 `https://cloudflare.com/cdn-cgi/trace`，一次刷新最多两次有界请求。跟随当前用户的系统代理和 TUN 路由；每次重新建立连接，保留证书验证，禁用重定向、cookie 和 keep-alive，响应上限 16 KiB。仅解析公网 IP 与 ISO 两位国家代码，不保存城市、坐标或历史 IP。
 
-30s 冷却内的刷新请求会合并并延迟执行；离线时等恢复再执行。稳定网络查询失败后等下次事件、菜单操作或 15 分钟保底刷新，避免循环重试。网络变化会清除旧位置，进行中的旧结果因网络代次不符被丢弃。定位失败且网络未变时保留旧值，Tooltip 的 IP 后 `*` 表示缓存。
+普通自动请求在 30s 冷却内合并并延迟执行；系统确认的网络变化和手动刷新采用 2s 合并限制，可在 ICMP 不可达时尝试查询。TUN 节点切换不一定产生网卡通知，因此每秒只读取本地配置和代理内核的连接元数据，观察到变化后请求复核；没有变化信号时，每 30s 复核一次。普通模式仍为 15 分钟保底。真实网络变化或手动刷新会清除旧位置，迟到结果不会覆盖新请求；普通代理建连不会清空有效位置。
 
-流量统计是当前探针路由出口网卡的总计数（含其他应用和局域网流量），不对物理网卡与 VPN 接口重复求和。程序使用系统路由，支持改变路由的 VPN/TUN；不读取应用 HTTP 代理或浏览器代理，因此国家可能与代理浏览器的出口不同。定位可解析 IPv4 / IPv6 文本，但心跳仅验证 IPv4。
+流量统计是当前探针路由出口网卡的总计数（含其他应用和局域网流量），不对物理网卡与 VPN 接口重复求和。定位跟随系统代理与 VPN/TUN 路由；仅在浏览器扩展内设置的代理无法被系统程序读取。ICMP 心跳验证系统 IPv4 路由，HTTP 代理不转发 ICMP，两者可能使用不同出口。定位可解析 IPv4 / IPv6 文本。
 
 ## 本地诊断
 
@@ -137,6 +140,8 @@ Start-Process ./dist/GeoPulse-windows-amd64.exe -ArgumentList '--diagnose=15s --
 Start-Process ./dist/GeoPulse-windows-amd64.exe -ArgumentList '--run-for=60s --output .artifacts/tray.json' -Wait
 Get-Content .artifacts/tray.json
 ```
+
+替换正在运行的版本前可执行 `./dist/GeoPulse-windows-amd64.exe --quit`，让原实例正常退出后再复制新 EXE。
 
 诊断包含公网 IP，`.artifacts/` 默认忽略。`memory_with_tray` 在托盘仍存活时取样；`memory` 在退出托盘后取样。较新 Windows 额外返回 `private_working_set_bytes`；旧系统不支持时省略，不能解读为零。
 

@@ -25,13 +25,13 @@ var (
 	closeHandle     = winhttp.NewProc("WinHttpCloseHandle")
 )
 
-// Fetch 只由事件驱动工作队列调用。先固定 IP（无需 DNS），失败才用域名。
-// WinHTTP 使用系统 TLS 验证，不关闭证书检查，不读取系统 HTTP 代理。
+// Fetch 由事件/有限频率工作队列调用。使用域名，跟随当前系统路由和代理规则。
+// WinHTTP 使用系统 TLS 验证，同时继承当前用户的系统代理配置。
 // 同步请求在后台执行；绝不跨线程关闭同步句柄（WinHTTP 禁止这种竞态）。
 // 取消在每个有界系统调用之间检查，迟到结果由 app 的网络代次校验丢弃。
 func Fetch(ctx context.Context) (Info, error) {
 	var lastErr error
-	for _, host := range []string{"1.1.1.1", "www.cloudflare.com"} {
+	for _, host := range []string{"www.cloudflare.com", "cloudflare.com"} {
 		if err := ctx.Err(); err != nil {
 			return Info{}, err
 		}
@@ -50,7 +50,8 @@ func Fetch(ctx context.Context) (Info, error) {
 
 func fetchHost(ctx context.Context, host string) ([]byte, error) {
 	agent := winapi.UTF16("GeoPulse/1.0")
-	session, _, err := open.Call(uintptr(unsafe.Pointer(agent)), 1, 0, 0, 0)
+	// AUTOMATIC_PROXY=4；NO_PROXY=1 不能代表浏览器使用的系统代理出口。
+	session, _, err := open.Call(uintptr(unsafe.Pointer(agent)), 4, 0, 0, 0)
 	if session == 0 {
 		return nil, winapi.Error("WinHttpOpen", err)
 	}
@@ -71,8 +72,9 @@ func fetchHost(ctx context.Context, host string) ([]byte, error) {
 		return nil, winapi.Error("WinHttpOpenRequest", err)
 	}
 	defer closeHandle.Call(request)
-	// 禁用自动重定向与 cookie；避免被引到大响应或登录门户。
-	var disable uint32 = 2 | 1
+	// 禁用重定向、cookie 与 keep-alive。每次重新连接，避免节点切换后
+	// 沿用指向旧出口的 TCP/TLS 连接；仍然保留完整证书验证。
+	var disable uint32 = 2 | 1 | 8
 	if ok, _, err := setOption.Call(request, 63, uintptr(unsafe.Pointer(&disable)), 4); ok == 0 {
 		return nil, winapi.Error("WinHttpSetOption", err)
 	}

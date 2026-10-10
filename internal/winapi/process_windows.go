@@ -26,6 +26,20 @@ func SingleInstance() (release func(), alreadyRunning bool, err error) {
 	return release, callErr == syscall.Errno(183), nil
 }
 
+// RequestExit 供更新时的 --quit 使用，向同一会话的 GeoPulse 隐藏窗口请求正常退出。
+func RequestExit() error {
+	user := DLL("user32.dll")
+	name := UTF16("GeoPulseHiddenWindow")
+	hwnd, _, _ := user.NewProc("FindWindowW").Call(uintptr(unsafe.Pointer(name)), 0)
+	if hwnd == 0 {
+		return nil
+	}
+	if ok, _, err := user.NewProc("PostMessageW").Call(hwnd, 0x10, 0, 0); ok == 0 {
+		return Error("GeoPulse exit", err)
+	}
+	return nil
+}
+
 type Memory struct {
 	PrivateWorkingSetBytes *uint64 `json:"private_working_set_bytes,omitempty"`
 	WorkingSetBytes        uint64  `json:"working_set_bytes"`

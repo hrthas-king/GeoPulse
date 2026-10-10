@@ -29,9 +29,17 @@ func main() {
 	runFor := flag.Duration("run-for", 0, "托盘冒烟测试后自动退出，例如 15s")
 	output := flag.String("output", "", "诊断 JSON 输出路径（包含公网 IP，请勿公开提交）")
 	showVersion := flag.Bool("version", false, "显示版本")
+	quit := flag.Bool("quit", false, "请求当前会话的 GeoPulse 正常退出，供更新使用")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("GeoPulse", version)
+		return
+	}
+	if *quit {
+		if err := winapi.RequestExit(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		return
 	}
 	if *diagnose < 0 || *runFor < 0 {
@@ -75,10 +83,10 @@ func run(diagnose, runFor time.Duration, output string) error {
 	if watchErr != nil {
 		watchError = watchErr.Error()
 	}
-	engine := app.New(app.Dependencies{ReadCounters: network.ReadCounters, Ping: pinger.Ping, Fetch: ipinfo.Fetch,
-		NetworkEvents: watcher.Events, WatchError: watchError})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	engine := app.New(app.Dependencies{ReadCounters: network.ReadCounters, Ping: pinger.Ping, Fetch: ipinfo.Fetch,
+		NetworkEvents: watcher.Events, EgressEvents: network.WatchEgress(ctx), WatchError: watchError})
 	var latest atomic.Pointer[app.Snapshot]
 	settings := config.Load()
 	started := time.Now()

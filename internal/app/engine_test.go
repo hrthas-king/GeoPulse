@@ -90,7 +90,7 @@ func TestNetworkChangeDiscardsInflightLocation(t *testing.T) {
 	for {
 		select {
 		case s := <-snapshots:
-			if s.Status == monitor.Unknown && s.GeoRefreshing {
+			if s.Status == monitor.Unknown && s.GeoRefreshing && s.Probe.Uplink == monitor.UplinkUnknown {
 				goto eventProcessed
 			}
 		case <-deadline:

@@ -71,6 +71,12 @@ type Rates struct {
 	Valid bool    `json:"valid"`
 }
 
+// EgressEvent 来自本地 TUN/代理配置或传输端点变化，不发送公网请求。
+type EgressEvent struct {
+	Active  bool
+	Changed bool
+}
+
 type Sampler struct{ previous *Counters }
 
 func (s *Sampler) Reset() { s.previous = nil }
