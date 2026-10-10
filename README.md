@@ -1,5 +1,7 @@
 # GeoPulse
 
+<img src="assets/icon.png" alt="GeoPulse 应用图标" width="160">
+
 ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
 ![Go](https://img.shields.io/badge/Go-1.24%2B-00ADD8)
 ![CGO](https://img.shields.io/badge/CGO-disabled-brightgreen)
@@ -8,7 +10,7 @@
 
 **秒级网络感知，极低带宽开销的 Windows 托盘 IP / 国家监控工具。**
 
-双击单个 `.exe` 即静默驻留，无控制台、无任务栏窗口、无需管理员或运行时安装。Go 直接调用 Win32 托盘、IP Helper 和 WinHTTP API；不使用 CGo、Electron、WinForms 或外部 `ping.exe`，第三方 Go 依赖为零。
+双击单个 `.exe` 即静默驻留，无控制台、无任务栏窗口、无需管理员或运行时安装。Go 直接调用 Win32 托盘、IP Helper 和 WinHTTP API；不使用 CGo、Electron、WinForms 或外部 `ping.exe`，应用运行代码的第三方 Go 依赖为零。
 
 ## 功能
 
@@ -26,6 +28,8 @@
 **内存说明：**10 MB 是资源目标，不能以 Go 堆软限制替代整个进程的硬性保证。Windows 共享 DLL、TLS、驱动与系统版本都会影响占用。实测数据、测量口径与未达成的限制见 [验证记录](docs/VALIDATION.md)。
 
 **v0.1.1 修复：**图标朝向恢复正常，TUN 内切换节点可以更新地区。手动刷新最短合并间隔为 2 秒；没有可观察本地切换信号的客户端，自动更新最多等待约 30 秒加查询时间。[更新记录](docs/CHANGELOG.md)
+
+**v0.1.2 应用图标：**EXE 和快捷方式使用上方蓝绿定位心跳图案；托盘继续显示国家代码、状态点与上下行箭头。
 
 ## 功能截图预留位
 
@@ -63,7 +67,7 @@ go vet ./...
 $env:CGO_ENABLED = '0'
 $env:GOOS = 'windows'
 $env:GOARCH = 'amd64'
-go build -trimpath -ldflags "-s -w -H=windowsgui -X main.version=v0.1.0" -o dist/GeoPulse.exe ./cmd/geopulse
+go build -trimpath -ldflags "-s -w -H=windowsgui -X main.version=v0.1.2" -o dist/GeoPulse.exe ./cmd/geopulse
 ```
 
 `-s -w` 去掉符号与调试信息，`-H=windowsgui` 去掉控制台，`-trimpath` 去掉构建机器路径。更换 `$env:GOARCH = 'arm64'` 即可交叉编译 ARM64。依赖均来自 Go 标准库，故没有 `go.sum`。
@@ -72,16 +76,30 @@ go build -trimpath -ldflags "-s -w -H=windowsgui -X main.version=v0.1.0" -o dist
 
 ```powershell
 ./scripts/verify.ps1
-./scripts/package.ps1 -Version v0.1.0
+./scripts/package.ps1 -Version v0.1.2
 ```
 
-打包脚本同时生成双架构运行 ZIP 和 `GeoPulse-v0.1.0-source.zip` 完整源码包，均位于 `dist/`。
+打包脚本同时生成双架构运行 ZIP 和 `GeoPulse-v0.1.2-source.zip` 完整源码包，均位于 `dist/`。
+
+### 应用图标
+
+`assets/icon.png` 是用户提供的原始图案；`assets/GeoPulse.ico` 包含 16、32、48、64、256 像素图标，可用于 Windows 快捷方式。`cmd/geopulse/rsrc_windows_*.syso` 是已保存的架构专用图标资源，`go build` 自动嵌入 EXE；普通构建和 CI 无需下载额外工具，也无需随 EXE 分发 ICO。
+
+更换图案时，替换 `assets/icon.png`，然后运行：
+
+```powershell
+./scripts/generate-icons.ps1
+./scripts/verify.ps1
+```
+
+生成脚本仅在更新图标时下载并运行固定版本的 [go-winres v0.3.3](https://github.com/tc-hib/go-winres/tree/v0.3.3)，生成两种架构资源及对应 ICO；该工具不会编入驻留程序。将 PNG、ICO 和两份 `.syso` 一起提交即可。
 
 ## 目录结构
 
 ```text
 GeoPulse/
-├── cmd/geopulse/main_windows.go     # 入口、配置、诊断和生命周期
+├── assets/                         # 原图、标准 ICO、图标资源配置
+├── cmd/geopulse/                    # 入口与双架构 Windows 图标资源
 ├── internal/
 │   ├── app/                        # 并发调度、定位限流、网络代次
 │   ├── config/                     # 仅持久化显示间隔
@@ -93,6 +111,7 @@ GeoPulse/
 │   └── winapi/                     # 系统 DLL、单实例、资源测量
 ├── scripts/
 │   ├── build.ps1
+│   ├── generate-icons.ps1          # 更换图案时重新生成 ICO / 资源
 │   ├── package.ps1
 │   └── verify.ps1
 ├── docs/
@@ -174,8 +193,8 @@ gh repo create GeoPulse --public --source=. --remote=origin --push
 确认 CI 通过后创建版本 Tag：
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 `.github/workflows/release.yml` 先在 Windows 测试，再在 Linux 以 `CGO_ENABLED=0` 交叉编译 Windows amd64 / arm64，生成 ZIP、`SHA256SUMS.txt`，最后用 GitHub 自带 `GITHUB_TOKEN` 发布 Release，无需手动保存发布密钥。只有发布 job 有 `contents: write` 权限。手动运行工作流只生成构建附件，不发布无 Tag 的 Release。
