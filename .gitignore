@@ -1,0 +1,20 @@
+# 编译、验证及本地工具链
+/dist/
+/.artifacts/
+/.toolchain/
+/coverage.out
+*.exe
+*.test
+*.log
+
+# IDE 与系统缓存
+/.idea/
+/.vscode/
+*.swp
+Thumbs.db
+.DS_Store
+
+# 运行设置保存在 LOCALAPPDATA，不应进入仓库
+config.json
+.env
+.env.*
