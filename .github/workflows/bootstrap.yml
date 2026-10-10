@@ -42,14 +42,16 @@ jobs:
       - name: Test, vet and build both architectures
         shell: pwsh
         run: ./scripts/verify.ps1
-      - name: Commit verified source tree and remove upload helpers
+      - name: Commit verified application sources and remove archive
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          Remove-Item -LiteralPath 'GeoPulse-v0.1.0-source.zip', '.github/workflows/bootstrap.yml'
+          Remove-Item -LiteralPath 'GeoPulse-v0.1.0-source.zip'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add --all
+          # GitHub's built-in token cannot change workflow files.
+          # The two final workflows are published through the authenticated browser.
+          git add --all -- . ':(exclude).github/workflows'
           git commit -m 'feat: import validated GeoPulse source tree'
           if ($LASTEXITCODE -ne 0) { throw 'Source commit failed' }
           git push origin HEAD:main
